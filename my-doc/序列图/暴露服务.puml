@@ -1,0 +1,29 @@
+@startuml
+autonumber
+
+ ServiceConfig -> ServiceConfig :doExport()
+
+ ServiceConfig -> ServiceConfig :doExportUrls()
+
+ ServiceConfig -> ServiceConfig :loadRegistries()
+ note left : 加载服务注册中心
+
+ ServiceConfig -> ServiceConfig :doExportUrlsFor1Protocol()
+
+ ServiceConfig -> Protocol.Adaptive :export()
+ note left: 协议为registry
+
+ Protocol.Adaptive -> ProtocolListenerWrapper :export()
+ ProtocolListenerWrapper -> ProtocolFilterWrapper :export()
+ ProtocolFilterWrapper -> RegistryProtocol :export()
+
+ RegistryProtocol -> RegistryProtocol :doLocalExport()
+ note right: 这里启动netty服务器
+
+ RegistryProtocol -> RegistryProtocol :getRegistry()
+ note right: 获取注册中心
+
+ RegistryProtocol -> RegistryProtocol :register()
+ note right: 注册到治理服务中心
+
+@enduml

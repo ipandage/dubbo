@@ -180,6 +180,7 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
     }
 
     public synchronized void export() {
+        // 是否需要导出服务
         if (!shouldExport()) {
             return;
         }
@@ -199,9 +200,11 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
         serviceMetadata.setServiceInterfaceName(getInterface());
         serviceMetadata.setTarget(getRef());
 
+        // 延迟发布 通过 ScheduledExecutorService 实现
         if (shouldDelay()) {
             DELAY_EXPORT_EXECUTOR.schedule(this::doExport, getDelay(), TimeUnit.MILLISECONDS);
         } else {
+            // 直接发布
             doExport();
         }
     }
@@ -302,6 +305,7 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
                 serviceMetadata
         );
 
+        // 加载所有服务注册中心对象，一个服务可以注册到多个服务注册中心
         List<URL> registryURLs = ConfigValidationUtils.loadRegistries(this, true);
 
         for (ProtocolConfig protocolConfig : protocols) {
@@ -312,6 +316,7 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
             repository.registerService(pathKey, interfaceClass);
             // TODO, uncomment this line once service key is unified
             serviceMetadata.setServiceKey(pathKey);
+            // 把参数封装到URL，然后具体执行服务导出
             doExportUrlsFor1Protocol(protocolConfig, registryURLs);
         }
     }
@@ -334,6 +339,7 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
         AbstractConfig.appendParameters(map, provider);
         AbstractConfig.appendParameters(map, protocolConfig);
         AbstractConfig.appendParameters(map, this);
+        // 解析 MethodConfig 配置
         if (CollectionUtils.isNotEmpty(getMethods())) {
             for (MethodConfig method : getMethods()) {
                 AbstractConfig.appendParameters(map, method, method.getName());
@@ -390,10 +396,12 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
             } // end of methods for
         }
 
+        // 如果是泛型调用，设置泛型类型
         if (ProtocolUtils.isGeneric(generic)) {
             map.put(GENERIC_KEY, generic);
             map.put(METHODS_KEY, ANY_VALUE);
         } else {
+            // 正常调用设置拼接URL参数
             String revision = Version.getVersion(interfaceClass, version);
             if (revision != null && revision.length() > 0) {
                 map.put(REVISION_KEY, revision);
@@ -417,6 +425,7 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
         //init serviceMetadata attachments
         serviceMetadata.getAttachments().putAll(map);
 
+        // 拼接URL对象
         // export service
         String host = findConfigedHosts(protocolConfig, registryURLs, map);
         Integer port = findConfigedPorts(protocolConfig, name, map);
@@ -429,16 +438,21 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
                     .getExtension(url.getProtocol()).getConfigurator(url).configure(url);
         }
 
+        // 导出服务 本地服务，远程服务
         String scope = url.getParameter(SCOPE_KEY);
         // don't export when none is configured
+        // 如果 scope 为 SCOPE_NONE 不导出服务
         if (!SCOPE_NONE.equalsIgnoreCase(scope)) {
 
+            // 如果 scope 不是 SCOPE_REMOTE 则导出本地服务
             // export to local if the config is not remote (export to remote only when config is remote)
             if (!SCOPE_REMOTE.equalsIgnoreCase(scope)) {
                 exportLocal(url);
             }
+            // 如果 scope 不是 SCOPE_LOCAL 则导出远程服务
             // export to remote if the config is not local (export to local only when config is local)
             if (!SCOPE_LOCAL.equalsIgnoreCase(scope)) {
+                // 如果有服务注册中心地址
                 if (CollectionUtils.isNotEmpty(registryURLs)) {
                     for (URL registryURL : registryURLs) {
                         //if protocol is only injvm ,not register
@@ -471,6 +485,7 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
                         exporters.add(exporter);
                     }
                 } else {
+                    // 直连方式
                     if (logger.isInfoEnabled()) {
                         logger.info("Export dubbo service " + interfaceClass.getName() + " to url " + url);
                     }
@@ -484,6 +499,7 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
                  * @since 2.7.0
                  * ServiceData Store
                  */
+                // 元数据存储
                 WritableMetadataService metadataService = WritableMetadataService.getExtension(url.getParameter(METADATA_KEY, DEFAULT_METADATA_STORAGE_TYPE));
                 if (metadataService != null) {
                     metadataService.publishServiceDefinition(url);
